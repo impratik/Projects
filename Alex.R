@@ -10,6 +10,10 @@ library(tidyverse)
 library(dplyr)
 library(skimr)
 library(lubridate)
+library(openxlsx)
+library(gt)
+library(hrbrthemes)
+library(viridis)
 
 # Loading Data ------------------------------------------------------------
 
@@ -106,10 +110,14 @@ CovidDeaths %>% select(date,total_cases, total_deaths, new_cases, new_deaths, co
 
 # GLobal Data total
 
-CovidDeaths %>% select(total_cases, total_deaths, new_cases, new_deaths, continent) %>%
+table1 <- CovidDeaths %>% select(total_cases, total_deaths, new_cases, new_deaths, continent) %>%
   filter(continent != "") %>% summarise( total_cases = sum(new_cases, na.rm = T),
                                          total_deaths = sum(total_deaths, na.rm = T),
                                          DeathPercentage = (sum(new_deaths,na.rm = T)/sum(new_cases,na.rm = T)) * 100)
+table1
+write_csv(table1,'~/Final Data/table1.csv')
+
+
 
 # Joining two dataset ----------------------------------------------------
 
@@ -129,7 +137,7 @@ df %>%  select(continent.x, location , date, population , new_vaccinations) %>%
 
 df %>%  select(continent.x, location , date, population , new_vaccinations) %>% 
   filter(continent.x!= "") %>% 
-  group_by(location,date) %>% mutate( total = new_vaccinations + )
+  group_by(location,date) %>% mutate( total = new_vaccinations  )
 
 
 df %>%   select(continent.x, location , date, population , new_vaccinations) %>% 
@@ -162,5 +170,76 @@ df %>%  select(continent.x , location, date, population , new_vaccinations) %>%
   filter(continent.x != "") %>% 
   group_by(location) %>% 
   mutate(RollingPeopleVaccinated = cumsum(replace_na(new_vaccinations,0))) %>%
-  mutate(total  = RollingPeopleVaccinated/population * 100) %>%  View()
+  mutate(total  = RollingPeopleVaccinated/population * 100)
 
+
+# creating table data -----------------------------------------------------
+
+# 1..... 
+
+table1 <- CovidDeaths %>% select(total_cases, total_deaths, new_cases, new_deaths, continent) %>%
+  filter(continent != "") %>% summarise( total_cases = sum(new_cases, na.rm = T),
+                                         total_deaths = sum(new_deaths, na.rm = T),
+                                         DeathPercentage = (sum(new_deaths,na.rm = T)/sum(new_cases,na.rm = T)) * 100)
+table1
+
+write_csv(table1,'~/Final Data/table1.csv')
+
+# 2...........
+`%!in%` = Negate(`%in%`)
+
+table2 <- CovidDeaths %>% select(total_cases, total_deaths, new_cases, new_deaths, continent, location) %>%
+  filter(continent == "" , location %!in% c('World', 'European Union', 'International') ) %>% group_by(location) %>% 
+  summarise( TotalDeathCount = sum(new_deaths, na.rm = T))
+
+table2
+
+write.xlsx(table2, '~/Final Data/table2.xlsx')
+
+#3..............
+
+table3 <- df %>%  select(location, population, total_cases) %>%  group_by(location, population) %>% 
+  summarise(HighestInfectionCount = max(total_cases) , PercentPopulationInfected =max((total_cases/population)) * 100) %>% 
+  arrange(desc(PercentPopulationInfected))
+
+table3[is.na(table3)] <-0 
+
+write.csv(table3,'~/Final Data/table3.csv')
+
+#4...................
+
+table4 <- df %>%  select(location, population,date, total_cases) %>%  group_by(location, population, date) %>% 
+  summarise(HighestInfectionCount = max(total_cases) , PercentPopulationInfected =max((total_cases/population)) * 100) %>% 
+  arrange(desc(PercentPopulationInfected))
+
+table4[is.na(table4)] <-0 
+
+write.csv(table4,'~/Final Data/table4.csv')
+
+
+
+# Data Plotting -----------------------------------------------------------
+
+table2 %>% ggplot(aes(location, TotalDeathCount)) + geom_col()
+
+
+table2 %>% 
+  arrange(TotalDeathCount) %>% 
+  mutate(location = factor(location, levels = c("Europe", "South America", "North America", "Asia" , "Africa" , "Oceania")))%>% 
+  ggplot(aes(location, TotalDeathCount)) +
+  geom_col(fill = "steelblue") + 
+  xlab("Continent") + 
+  ylab("Total Death Count") +
+  theme_light() +
+  ggtitle("Total Deaths Per Continent")
+  
+table4 %>% filter( grepl('India|United States|United Kingdom|China|Russia', location)) %>%  
+  ggplot(aes(date, PercentPopulationInfected)) + geom_point(color = "")
+  
+
+table4 %>% filter( str_detect(location,'India|United States|United Kingdom|China|Russia')) %>%  
+  ggplot(aes(date, PercentPopulationInfected , color = location )) + geom_line() +
+  scale_color_viridis(discrete = TRUE) +
+  ggtitle("Percent Population Infected") +
+  theme_ipsum() +
+  ylab("month")
